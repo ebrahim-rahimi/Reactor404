@@ -1,0 +1,334 @@
+Hier ist der exakt auf deine tatsächliche Quellcode-Implementierung aus der Zip-Datei (`Raumschiff.java`, `EreignisManager.java`, `ReactorGUI.java`, `Main.java`) abgestimmte und personalisierte Pseudocode. Er bildet deine genauen Methodennamen, Feldern, Farben, Konstruktor-Verknüpfungen und UI-Abläufe detailgetreu ab:
+
+
+        ============================================================================
+                        PROJEKT: REACTOR 404 // NUCLEAR SPACESHIP
+              Mein persönlicher Entwurf basierend auf meinen 4 Java-Klassen
+        ============================================================================
+
+
+
+// 1. KLASSE: Raumschiff
+// Verwaltet die Schiffsattribute, Wertegrenzen (0-100) und Abzugslogik
+// ============================================================================
+
+KLASSE Raumschiff:
+    // Schiffsattribute (0 bis 100)
+    PRIVAT reaktor: INTEGER
+    PRIVAT huelle: INTEGER
+    PRIVAT kuehlung: INTEGER
+
+    KONSTRUKTOR Raumschiff():
+        // Startwerte wie in meinem Konstruktor gesetzt
+        reaktor = 100
+        huelle = 100
+        kuehlung = 100
+
+    // Meine universelle Hilfsmethode zur Wertebegrenzung zwischen 0 und 100
+    PRIVAT METHODE begrenzen(wert: INTEGER) -> INTEGER:
+        IF wert < 0 THEN
+            RETURN 0
+        ELSE IF wert > 100 THEN
+            RETURN 100
+        ELSE
+            RETURN wert
+        END IF
+
+    // Sekundlicher Zerfall der Schiffssysteme
+    METHODE tick():
+        kuehlung = begrenzen(kuehlung - 1)
+        huelle = begrenzen(huelle - 1)
+
+        // Wenn Kühlung leer ist, verliert der Reaktor viermal so schnell Stabilität (-4)
+        IF kuehlung <= 0 THEN
+            reaktor = begrenzen(reaktor - 4)
+        ELSE
+            reaktor = begrenzen(reaktor - 1)
+        END IF
+
+    // Manuelle Reparaturen & Nachfüllen
+    METHODE reaktorReparieren():
+        // Benötigt mindestens 10 Kühlung als Ressource
+        IF kuehlung >= 10 THEN
+            kuehlung = begrenzen(kuehlung - 10)
+            reaktor = begrenzen(reaktor + 15)
+        END IF
+
+    METHODE huelleReparieren():
+        huelle = begrenzen(huelle + 20)
+
+    METHODE kuehlungAuffuellen():
+        kuehlung = begrenzen(kuehlung + 25)
+
+    // Schadensmethoden bei Asteroid & verpasstem Notfall
+    METHODE asteroidTreffer():
+        huelle = begrenzen(huelle - 20)
+        reaktor = begrenzen(reaktor - 15)
+
+    METHODE notfallSchaden():
+        huelle = begrenzen(huelle - 15)
+        reaktor = begrenzen(reaktor - 10)
+
+    // Abbruchprüfung: Reaktor oder Hülle auf 0
+    METHODE istZerstoert() -> BOOLEAN:
+        RETURN (reaktor <= 0 OR huelle <= 0)
+
+    // Getter
+    METHODE getReaktor() -> INTEGER: RETURN reaktor
+    METHODE getHuelle() -> INTEGER: RETURN huelle
+    METHODE getKuehlung() -> INTEGER: RETURN kuehlung
+END KLASSE
+// ============================================================================
+
+
+
+
+// 2. KLASSE: EreignisManager
+// Verwaltet die Zufallstimer für Asteroiden und den 6-Sekunden-Notfalltakt
+// ============================================================================
+
+KLASSE EreignisManager:
+    PRIVAT hatNotfall: BOOLEAN
+    PRIVAT notfallSekunden: INTEGER
+    PRIVAT naechsterAsteroid: INTEGER
+    PRIVAT zufall: Random
+
+    KONSTRUKTOR EreignisManager():
+        zufall = NEW Random()
+        hatNotfall = FALSE
+        notfallSekunden = 0
+        naechsterAsteroidBerechnen()
+
+    // Berechnet zufälligen Abstand: 8 + Zufall(0..8) -> 8 bis 16 Sekunden
+    PRIVAT METHODE naechsterAsteroidBerechnen():
+        naechsterAsteroid = 8 + zufall.nextInt(9)
+
+    // Wird pro Spielsekunde aufgerufen: Zählt den Einschlag-Timer runter
+    METHODE tick() -> BOOLEAN:
+        IF NOT hatNotfall THEN
+            naechsterAsteroid = naechsterAsteroid - 1
+            IF naechsterAsteroid <= 0 THEN
+                hatNotfall = TRUE
+                notfallSekunden = 6
+                naechsterAsteroidBerechnen()
+                RETURN TRUE // Löst Einschlag aus
+            END IF
+        END IF
+        RETURN FALSE
+
+    // Zählt während eines aktiven Notfalls die verbleibende Reaktionszeit runter
+    METHODE notfallTick() -> BOOLEAN:
+        IF hatNotfall THEN
+            notfallSekunden = notfallSekunden - 1
+            IF notfallSekunden <= 0 THEN
+                hatNotfall = FALSE
+                RETURN TRUE // Frist verpasst -> Zusatzschaden fällig
+            END IF
+        END IF
+        RETURN FALSE
+
+    // Vom Notfall-Button aufgerufen
+    METHODE notfallBeheben():
+        hatNotfall = FALSE
+        notfallSekunden = 0
+
+    // Getter
+    METHODE hatNotfall() -> BOOLEAN: RETURN hatNotfall
+    METHODE getNotfallSekunden() -> INTEGER: RETURN notfallSekunden
+END KLASSE
+// ============================================================================
+
+
+
+
+// 3. KLASSE: ReactorGUI
+// Erstellt die Swing-Komponenten im Terminal-Look und steuert den Spiel-Timer
+// ============================================================================
+KLASSE ReactorGUI ERWEITERT JFrame:
+    // Farb-Konstanten für das Hacker-/SciFi-Theme
+    KONSTANTE NEON_GRUEN  = Color(70, 245, 155)
+    KONSTANTE TIEFSCHWARZ = Color(8, 17, 22)
+    KONSTANTE PANEL_GRUEN = Color(30, 50, 45)
+    KONSTANTE ALARM_ROT   = Color(240, 75, 75)
+    KONSTANTE DUNKELROT   = Color(130, 35, 35)
+    KONSTANTE GRAU        = Color(145, 165, 160)
+
+    // Referenzen zu Logik & Zustand
+    PRIVAT raumschiff: Raumschiff
+    PRIVAT ereignisManager: EreignisManager
+    PRIVAT timer: Timer
+    PRIVAT sekundenUeberlebt: INTEGER
+
+    // UI-Elemente
+    PRIVAT balkenReaktor: JProgressBar
+    PRIVAT balkenHuelle: JProgressBar
+    PRIVAT balkenKuehlung: JProgressBar
+    PRIVAT btnReaktor: JButton
+    PRIVAT btnHuelle: JButton
+    PRIVAT btnKuehlung: JButton
+    PRIVAT btnNotfall: JButton
+    PRIVAT lblAlarm: JLabel
+
+    KONSTRUKTOR ReactorGUI():
+        SUPER("REACTOR 404 // NUCLEAR SPACESHIP")
+        raumschiff = NEW Raumschiff()
+        ereignisManager = NEW EreignisManager()
+        sekundenUeberlebt = 0
+
+        // Grundeinstellungen für das JFrame
+        setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE)
+        setSize(520, 620)
+        setLocationRelativeTo(NULL) // zentrieren
+        getContentPane().setBackground(TIEFSCHWARZ)
+        setLayout(NEW BorderLayout())
+
+        // 1. Titel-Panel
+        lblTitel = NEW JLabel("[ REACTOR_404 ]  //  SHIP CONTROL", JLabel.CENTER)
+        lblTitel.setFont(MONOSPACED, BOLD, 18)
+        lblTitel.setForeground(NEON_GRUEN)
+
+        // 2. Statusbalken über Hilfsmethode balken() erzeugen
+        balkenReaktor = balken()
+        balkenHuelle = balken()
+        balkenKuehlung = balken()
+
+        // 3. Reparatur-Buttons anlegen und stylen
+        btnReaktor = NEW JButton("REAKTOR +15")
+        btnHuelle = NEW JButton("HUELLE +20")
+        btnKuehlung = NEW JButton("KUEHLUNG +25")
+        btnNotfall = NEW JButton("NOTFALL-REPARATUR")
+        btnNotfall.setVisible(FALSE) // Erst bei Notfall einblenden
+
+        lblAlarm = NEW JLabel(" ", JLabel.CENTER)
+        lblAlarm.setFont(MONOSPACED, BOLD, 13)
+        lblAlarm.setForeground(ALARM_ROT)
+
+        // 4. ActionListener mit Schiffs- und Manager-Aktionen verknüpfen
+        btnReaktor.ADD_ACTION_LISTENER:
+            raumschiff.reaktorReparieren()
+            aktualisieren()
+
+        btnHuelle.ADD_ACTION_LISTENER:
+            raumschiff.huelleReparieren()
+            aktualisieren()
+
+        btnKuehlung.ADD_ACTION_LISTENER:
+            raumschiff.kuehlungAuffuellen()
+            aktualisieren()
+
+        btnNotfall.ADD_ACTION_LISTENER:
+            IF ereignisManager.hatNotfall() THEN
+                ereignisManager.notfallBeheben()
+                lblAlarm.setText("NOTFALL BEHOBEN - SYSTEME STABILISIERT")
+                lblAlarm.setForeground(NEON_GRUEN)
+                aktualisieren()
+            END IF
+
+        // 5. Layout zusammenfügen (Titel Nord, Bars/Buttons Center, Alarm/Notfall Süd)
+        komponentenAnordnen()
+
+        // 6. Swing-Timer mit 1000ms Intervall für den Spieltakt starten
+        timer = NEW Timer(1000, ACTION_EVENT -> spielTick())
+        timer.start()
+
+        // Initiale Darstellung aktualisieren
+        aktualisieren()
+
+    // Erzeugt einen einheitlich formatierten Statusbalken
+    PRIVAT METHODE balken() -> JProgressBar:
+        b = NEW JProgressBar(0, 100)
+        b.setStringPainted(TRUE)
+        b.setFont(MONOSPACED, BOLD, 12)
+        b.setBackground(PANEL_GRUEN)
+        b.setForeground(NEON_GRUEN)
+        b.setPreferredSize(Dimension(460, 26))
+        RETURN b
+
+    // Erzeugt Beschriftungslabels im Terminal-Stil
+    PRIVAT METHODE beschriftung(text: STRING) -> JLabel:
+        lbl = NEW JLabel(text)
+        lbl.setFont(MONOSPACED, BOLD, 11)
+        lbl.setForeground(GRAU)
+        RETURN lbl
+
+    // Zentrale Taktmethode (jede Sekunde via Timer)
+    PRIVAT METHODE spielTick():
+        sekundenUeberlebt = sekundenUeberlebt + 1
+
+        // Schiffszustand reduzieren
+        raumschiff.tick()
+
+        // Asteroideneinschlag prüfen
+        IF ereignisManager.tick() THEN
+            raumschiff.asteroidTreffer()
+            Toolkit.getDefaultToolkit().beep()
+            lblAlarm.setForeground(ALARM_ROT)
+            lblAlarm.setText("ALARM: ASTEROID EINGESCHLAGEN!")
+        END IF
+
+        // Notfall-Frist prüfen
+        IF ereignisManager.notfallTick() THEN
+            raumschiff.notfallSchaden()
+            Toolkit.getDefaultToolkit().beep()
+            lblAlarm.setForeground(ALARM_ROT)
+            lblAlarm.setText("NOTFALL VERPASST! ZUSAETZLICHER SCHADEN!")
+        END IF
+
+        aktualisieren()
+
+        // Spielende prüfen
+        IF raumschiff.istZerstoert() THEN
+            timer.stop()
+            lblAlarm.setText("MISSION FEHLGESCHLAGEN - SCHIFF ZERSTOERT")
+            btnReaktor.setEnabled(FALSE)
+            btnHuelle.setEnabled(FALSE)
+            btnKuehlung.setEnabled(FALSE)
+            btnNotfall.setEnabled(FALSE)
+            JOptionPane.showMessageDialog(THIS,
+                "GAME OVER!\nDas Schiff wurde zerstoert.\nUeberlebte Zeit: " + sekundenUeberlebt + " Sekunden",
+                "REACTOR 404 // GAME OVER",
+                JOptionPane.ERROR_MESSAGE)
+        END IF
+
+    // Synchronisiert UI-Komponenten mit den Datenobjekten
+    PRIVAT METHODE aktualisieren():
+        setWert(balkenReaktor, raumschiff.getReaktor())
+        setWert(balkenHuelle, raumschiff.getHuelle())
+        setWert(balkenKuehlung, raumschiff.getKuehlung())
+
+        // Reaktor-Reparatur erfordert mind. 10 Kühlung
+        btnReaktor.setEnabled(raumschiff.getKuehlung() >= 10)
+
+        // Notfall-Button dynamisch einblenden & beschriften
+        IF ereignisManager.hatNotfall() THEN
+            btnNotfall.setVisible(TRUE)
+            btnNotfall.setText("! ! !  NOTFALL-REPARATUR: " + ereignisManager.getNotfallSekunden() + "s  ! ! !")
+        ELSE
+            btnNotfall.setVisible(FALSE)
+        END IF
+
+    // Setzt Balkenwert und passt Signalfarben bei kritischem Zustand an
+    PRIVAT METHODE setWert(balken: JProgressBar, wert: INTEGER):
+        balken.setValue(wert)
+        balken.setString(wert + "%")
+        IF wert <= 25 THEN
+            balken.setForeground(ALARM_ROT)
+        ELSE
+            balken.setForeground(NEON_GRUEN)
+        END IF
+END KLASSE
+// ============================================================================
+
+
+
+// 4. KLASSE: Main
+// Startpunkt der Anwendung im Event Dispatch Thread (EDT)
+// ============================================================================
+
+KLASSE Main:
+    METHODE main(args: ARRAY VON STRING):
+        SwingUtilities.invokeLater(() -> {
+            gui = NEW ReactorGUI()
+            gui.setVisible(TRUE)
+        })
+END KLASSE
